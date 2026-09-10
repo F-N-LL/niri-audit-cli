@@ -2,8 +2,6 @@
 set -u
 
 audit="${XDG_STATE_HOME:-$HOME/.local/state}/niri-fedora-system/system-snapshot.md"
-services=(niri-system-audit.timer waybar.service swayidle.service ydotoold.service gesture-nav.service lid-suspend.service)
-
 usage() {
   cat <<'EOF'
 niri-audit - inspect and maintain the Niri Fedora desktop
@@ -25,7 +23,7 @@ EOF
 
 health() {
   echo "== Versions =="
-  for name in niri waybar swaybg swayidle swaylock libinput ydotool brave-browser-stable; do
+  for name in niri waybar swaybg swayidle swaylock libinput ydotool; do
     path=$(command -v "$name" 2>/dev/null || true)
     [ -n "$path" ] || continue
     version=$($path --version 2>/dev/null | head -1 || true)

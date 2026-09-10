@@ -9,7 +9,7 @@ tmp="${report}.tmp"
   echo "Generated: $(date --iso-8601=seconds)"
   echo
   echo "## Versions"
-  for name in niri waybar swaybg swayidle swaylock libinput ydotool brave-browser-stable; do
+  for name in niri waybar swaybg swayidle swaylock libinput ydotool; do
     path=$(command -v "$name" 2>/dev/null || true)
     [ -n "$path" ] || continue
     version=$($path --version 2>/dev/null | head -1 || true)
@@ -23,7 +23,7 @@ tmp="${report}.tmp"
   systemctl --user --failed --no-legend 2>/dev/null || true
   echo
   echo "## Config checksums"
-  for file in "$HOME/.config/niri/config.kdl" "$HOME/.config/waybar/config.jsonc" "$HOME/.config/waybar/style.css" "$HOME/.config/swayidle/config" "$HOME/.config/systemd/user/gesture-nav.service" "$HOME/.config/systemd/user/ydotoold.service" "$HOME/.config/systemd/user/swayidle.service" "$HOME/.config/brave/carousel-gestures/manifest.json" "$HOME/.config/brave/carousel-gestures/carousel.js"; do
+  for file in "$HOME/.config/niri/config.kdl" "$HOME/.config/waybar/config.jsonc" "$HOME/.config/waybar/style.css" "$HOME/.config/swayidle/config" "$HOME/.config/systemd/user/gesture-nav.service" "$HOME/.config/systemd/user/ydotoold.service" "$HOME/.config/systemd/user/swayidle.service"; do
     [ -f "$file" ] && sha256sum "$file"
   done
   echo
