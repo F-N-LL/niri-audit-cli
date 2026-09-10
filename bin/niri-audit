@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -u
+
+audit="${XDG_STATE_HOME:-$HOME/.local/state}/niri-fedora-system/system-snapshot.md"
+services=(niri-system-audit.timer waybar.service swayidle.service ydotoold.service gesture-nav.service lid-suspend.service)
+
+usage() {
+  cat <<'EOF'
+niri-audit - inspect and maintain the Niri Fedora desktop
+
+Usage: niri-audit [command]
+
+Commands:
+  menu       Open the interactive menu (default)
+  audit      Generate a fresh daily system snapshot
+  health     Show versions, failed units, and running desktop processes
+  services   Show configured user services
+  logs       Show recent relevant user-service warnings
+  configs    Compare active configs with tracked dotfiles
+  snapshot   Print the latest saved snapshot
+  restart    Restart one safe component: waybar, gesture-nav, or audit
+  help       Show this help
+EOF
+}
+
+health() {
+  echo "== Versions =="
+  for name in niri waybar swaybg swayidle swaylock libinput ydotool brave-browser-stable; do
+    path=$(command -v "$name" 2>/dev/null || true)
+    [ -n "$path" ] || continue
+    version=$($path --version 2>/dev/null | head -1 || true)
+    if [[ -z "$version" || "$version" == Usage:* || "$version" == *"Unknown command"* ]]; then version="installed at $path"; fi
+    echo "$name: $version"
+  done
+  echo; echo "== Failed user units =="
+  systemctl --user --failed --no-legend 2>/dev/null || true
+  echo; echo "== Desktop processes =="
+  ps -eo pid=,comm=,args= | awk '$2 ~ /^(niri|waybar|swaybg|swayidle|swaylock|ydotoold|python3|brave-browser-stable)$/ && $0 !~ /--type=|codex-linux-sandbox|niri-audit/ {print}' | head -30
+}
+
+services() {
+  systemctl --user --no-legend --plain list-units --type=service,timer --all 2>/dev/null | grep -E 'niri|waybar|sway|ydotool|gesture|lid|audit|clip' || true
+}
+
+logs() {
+  journalctl --user -b -p warning..alert --no-pager -n 100 2>/dev/null | grep -Ei 'niri|waybar|sway|ydotool|gesture|lid|clip|audit' || echo "No relevant warnings found."
+}
+
+configs() {
+  for pair in \
+    "$HOME/.config/niri/config.kdl:$HOME/dotfiles/config/niri/config.kdl" \
+    "$HOME/.config/waybar/config.jsonc:$HOME/dotfiles/config/waybar/config.jsonc" \
+    "$HOME/.config/waybar/style.css:$HOME/dotfiles/config/waybar/style.css"; do
+    active=${pair%%:*}; tracked=${pair#*:}
+    echo "== $active =="
+    if [ -f "$active" ] && [ -f "$tracked" ]; then diff -u "$tracked" "$active" || true; else echo "Missing active or tracked file"; fi
+  done
+}
+
+restart_component() {
+  case "${1:-}" in
+    waybar) pkill -x waybar 2>/dev/null || true; nohup waybar >/tmp/waybar-niri-audit.log 2>&1 & echo "Waybar restarted." ;;
+    gesture-nav) systemctl --user restart gesture-nav.service; echo "gesture-nav restarted." ;;
+    audit) niri-system-audit; echo "Audit completed." ;;
+    *) echo "Choose: waybar, gesture-nav, or audit"; return 2 ;;
+  esac
+}
+
+menu() {
+  while true; do
+    echo; echo "Niri Fedora tools"; echo "1) Health  2) Services  3) Logs  4) Config diff  5) Run audit  6) Snapshot  7) Restart  8) Help   q) Quit"
+    read -r -p "Select: " choice
+    case "$choice" in
+      1) health ;; 2) services ;; 3) logs ;; 4) configs ;; 5) echo "Running system audit..."; if niri-system-audit; then echo "Audit complete: $audit"; else echo "Audit failed."; fi ;; 6) less "$audit" 2>/dev/null || echo "No snapshot yet." ;; 7) read -r -p "Component (waybar/gesture-nav/audit): " component; restart_component "$component" ;; 8) usage ;; q|Q) break ;; *) echo "Invalid selection." ;; esac
+    read -r -p "Press Enter to continue..." _
+  done
+}
+
+case "${1:-menu}" in
+  menu) menu ;; audit) niri-system-audit ;;
+  health) health ;; services) services ;; logs) logs ;; configs) configs ;;
+  snapshot) [ -f "$audit" ] && less "$audit" || echo "No snapshot yet. Run: niri-audit audit" ;;
+  restart) restart_component "${2:-}" ;; help|-h|--help) usage ;;
+  *) echo "Unknown command: $1" >&2; usage >&2; exit 2 ;;
+esac

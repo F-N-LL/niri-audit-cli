@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# Optional/local integrations; keep machine-specific add-ons out of this repo.
+config/brave/
+config/gesture/
+config/systemd/
+local/

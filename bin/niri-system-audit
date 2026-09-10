@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -u
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/niri-fedora-system"
+report="$state_dir/system-snapshot.md"
+mkdir -p "$state_dir"
+tmp="${report}.tmp"
+{
+  echo "# Niri Fedora system snapshot"
+  echo "Generated: $(date --iso-8601=seconds)"
+  echo
+  echo "## Versions"
+  for name in niri waybar swaybg swayidle swaylock libinput ydotool brave-browser-stable; do
+    path=$(command -v "$name" 2>/dev/null || true)
+    [ -n "$path" ] || continue
+    version=$($path --version 2>/dev/null | head -1 || true)
+    echo "- $name: $path — ${version:-version unavailable}"
+  done
+  echo
+  echo "## User services"
+  systemctl --user --no-legend --plain list-units --type=service --all 2>/dev/null | grep -E 'niri|waybar|sway|ydotool|gesture|lid|clip' || true
+  echo
+  echo "## Failed user units"
+  systemctl --user --failed --no-legend 2>/dev/null || true
+  echo
+  echo "## Config checksums"
+  for file in "$HOME/.config/niri/config.kdl" "$HOME/.config/waybar/config.jsonc" "$HOME/.config/waybar/style.css" "$HOME/.config/swayidle/config" "$HOME/.config/systemd/user/gesture-nav.service" "$HOME/.config/systemd/user/ydotoold.service" "$HOME/.config/systemd/user/swayidle.service" "$HOME/.config/brave/carousel-gestures/manifest.json" "$HOME/.config/brave/carousel-gestures/carousel.js"; do
+    [ -f "$file" ] && sha256sum "$file"
+  done
+  echo
+  echo "## Niri outputs"
+  niri msg outputs 2>&1 || true
+  echo
+  echo "## Recent relevant warnings"
+  journalctl --user -b -p warning..alert --no-pager -n 80 2>/dev/null | grep -Ei 'niri|waybar|sway|ydotool|gesture|lid|clip' || true
+  echo
+  echo "## Package updates available"
+  timeout 90s dnf -q check-update 2>/dev/null || true
+} > "$tmp"
+mv -f "$tmp" "$report"
